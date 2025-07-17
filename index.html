@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>마법세계관 텍스트 게임</title>
+  <style>
+    body {
+      font-family: "나눔고딕", "Nanum Gothic", sans-serif;
+      padding: 20px;
+      background-color: #f0f0f0;
+      color: #000;
+      transition: background-color 0.5s ease;
+      user-select: none;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    #story {
+      white-space: pre-line;
+      margin-bottom: 20px;
+      min-height: 120px;
+      font-size: 18px;
+    }
+    #choices button.choice-btn {
+      margin: 5px;
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background-color: #3b82f6;
+      color: white;
+      transition: background-color 0.3s;
+    }
+    #choices button.choice-btn:hover {
+      background-color: #2563eb;
+    }
+    #health-display {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: #eee;
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-weight: bold;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      user-select: none;
+    }
+    /* 폭죽 애니메이션 간단 효과 */
+    @keyframes fireworks {
+      0%, 100% { background-color: #FFD700; }
+      50% { background-color: #FF4500; }
+    }
+    .fireworks {
+      animation: fireworks 0.6s infinite;
+    }
+  </style>
+</head>
+<body>
+  <h1>모험 텍스트 게임</h1>
+  <div id="health-display"></div>
+  <div id="story"></div>
+  <div id="choices"></div>
+
+  <script>
+    // 플레이어 상태 변수
+    let playerName = "주술사";
+    let playerLevel = 1;
+    let playerMaxHealth =800;
+    let playerHealth = playerMaxHealth;
+    let playerAttack = 10;
+
+    // 선택지 추적용 변수
+    let walkCount = 0;
+
+    // 몬스터 데이터
+    const monsters = {
+      slime: { health: 50, attack: 1 },
+      dragon: { health: 750, attack: 11 }
+    };
+
+    // DOM 요소 참조
+    const story = document.getElementById("story");
+    const choices = document.getElementById("choices");
+    const healthDisplay = document.getElementById("health-display");
+    const body = document.body;
+
+    // 초기 게임 시작 함수
+    function startAdventure() {
+      // 초기화
+      walkCount = 0;
+      playerLevel = 1;
+      playerMaxHealth = 800;
+      playerHealth = playerMaxHealth;
+      playerAttack = 10;
+      updateHealthDisplay();
+      removeFireworks();
+      resetBackground();
+
+      // 이름 입력 받기
+      story.innerHTML = `
+        <label>당신의 이름을 입력하세요: <input type="text" id="nameInput" autofocus></label>
+      `;
+      choices.innerHTML = `<button class="choice-btn" onclick="submitName()">입력 완료</button>`;
+    }
+
+    // 이름 제출 후 모험 시작
+    function submitName() {
+      const input = document.getElementById("nameInput");
+      if (!input.value.trim()) {
+        alert("이름을 입력해주세요!");
+        return;
+      }
+      playerName = input.value.trim();
+      story.textContent = `환영합니다, ${playerName}님! 당신은 ${playerLevel}레벨의 주술사입니다. 체력 ${playerHealth}, 공격력 ${playerAttack}입니다.`;
+      choices.innerHTML = `<button class="choice-btn" onclick="startPath()">모험 시작</button>`;
+      updateHealthDisplay();
+    }
+
+    // 모험 시작 경로 선택
+    function startPath() {
+      story.textContent = `오늘, ${playerName}님은 마법의 숲에 들어섰습니다.\n길은 두 갈래입니다. 어느 길로 가시겠습니까?`;
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="choosePath('left')">왼쪽 길</button>
+        <button class="choice-btn" onclick="choosePath('right')">오른쪽 길</button>
+      `;
+    }
+
+    // 경로 선택
+    function choosePath(path) {
+      if (path === 'left') {
+        leftPath();
+      } else {
+        rightPath();
+      }
+    }
+
+    // 왼쪽 길 시나리오
+    function leftPath() {
+      story.textContent = "왼쪽길에는 많은 돌과 길이 많이 있었습니다.그래서 반전술식이 필요했는데 반전술식으로 다친 부위를 치료할까요?";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="takeTreasure()">반전 술식으로 치료하기.(없다.)</button>
+        <button class="choice-btn" onclick="leaveTreasure()">그냥 나가기</button>
+      `;
+    }
+
+    function takeTreasure() {
+      // 독이 퍼져 죽음 엔딩
+      showEnding("curseDeath");
+    }
+
+    function leaveTreasure() {
+      // 독을 피해 바로 오른쪽 길로 간 것과 동일하게 살인마 만남 도망가기
+      rightPath();
+    }
+
+    // 오른쪽 길 시나리오
+    function rightPath() {
+      story.textContent = "오른쪽 길을 따라가자 저주가 옵니다.";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="chooseDragonFight('run')">도망간다</button>
+        <button class="choice-btn" onclick="chooseDragonFight('fight')">뚫는다</button>
+      `;
+    }
+
+    // 살인마와 싸우기 선택 분기
+    function chooseDragonFight(choice) {
+      if (choice === 'run') {
+        runFromDragon();
+      } else {
+        fightDragon();
+      }
+    }
+
+    // 살인마에게서 도망
+    function runFromDragon() {
+      story.textContent = "살인마를 피해 도망치는 도중 선택지가 나옵니다. 계속 도망가시겠습니까, 아니면 항아리 안에 숨으시겠습니까?";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="chooseRunOrHide('run')">계속 도망간다</button>
+        <button class="choice-btn" onclick="chooseRunOrHide('hide')">항아리 안에 들어간다</button>
+      `;
+    }
+
+    function chooseRunOrHide(choice) {
+      if (choice === 'run') {
+        cliffFall();
+      } else {
+        enterCave();
+      }
+    }
+
+    // 절벽 떨어짐 & 나뭇가지 잡기 선택지
+    function cliffFall() {
+      story.textContent = "절벽에서 떨어지고 있습니다! 나뭇가지를 잡으세요! (3초 안에 클릭해야 합니다)";
+      choices.innerHTML = `<button class="choice-btn" id="grabBranchBtn">나뭇가지 잡기</button>`;
+
+      const btn = document.getElementById("grabBranchBtn");
+      let clicked = false;
+
+      btn.onclick = () => {
+        clicked = true;
+        story.textContent = "나뭇가지를 잡았습니다! 절벽을 올라 동굴로 숨었습니다.";
+        setTimeout(enterCave, 1000);
+      };
+
+      setTimeout(() => {
+        if (!clicked) {
+          // 실패 시 사망 엔딩
+          showEnding("curseDeath");
+        }
+      }, 3000);
+    }
+
+    // 동굴 입장
+    function enterCave() {
+      story.textContent = "동굴 안에는 엄청난 주술 두 종류 있습니다. 주술1 과 주술2  중 어느 것을 가져가겠습니까?";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="chooseCrystal('blue')">주술1 가져가기</button>
+        <button class="choice-btn" onclick="chooseCrystal('yellow')">주술2 가져가기</button>
+      `;
+    }
+
+    // 수정 선택
+    function chooseCrystal(color) {
+      if (color === 'blue') {
+        levelUp(false);
+        story.textContent = `주술3급 합격 통지서를 가져가 레벨이 상승했습니다! 현재 레벨: ${playerLevel}`;
+        setTimeout(afterCave, 1500);
+      } else {
+        // 노란 수정은 레벨업과 비슷한 효과를 누른 후 나중에 누르면 레벨업
+        story.textContent = "엄청난 잠재력이 오른쪽 아래에 생겼습니다. 나중에 눌러서 레벨업 할 수 있습니다.";
+        showYellowCrystal();
+        setTimeout(afterCave, 1500);
+      }
+      choices.innerHTML = "";
+    }
+
+    // 노란 수정 UI 추가 및 클릭 이벤트
+    function showYellowCrystal() {
+      // 오른쪽 아래에 버튼 추가
+      let yellowBtn = document.getElementById("yellowCrystalBtn");
+      if (!yellowBtn) {
+        yellowBtn = document.createElement("button");
+        yellowBtn.id = "yellowCrystalBtn";
+        yellowBtn.textContent = "엄청난 잠재력";
+        yellowBtn.style.position = "fixed";
+        yellowBtn.style.bottom = "10px";
+        yellowBtn.style.right = "10px";
+        yellowBtn.style.padding = "8px 12px";
+        yellowBtn.style.fontSize = "14px";
+        yellowBtn.style.borderRadius = "5px";
+        yellowBtn.style.border = "none";
+        yellowBtn.style.backgroundColor = "#ffcc00";
+        yellowBtn.style.cursor = "pointer";
+        document.body.appendChild(yellowBtn);
+
+        yellowBtn.onclick = () => {
+          levelUp(false);
+          alert(`엄청난 잠재력!현재 레벨: ${playerLevel}`);
+          yellowBtn.remove();
+        };
+      }
+    }
+
+    // 동굴 밖 선택지 - 걷기/뛰기
+    function afterCave() {
+      story.textContent = "동굴에서 나왔습니다. 걷기와 뛰기 중 선택하세요.";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="chooseWalkOrRun('walk')">걷기</button>
+        <button class="choice-btn" onclick="chooseWalkOrRun('run')">뛰기</button>
+      `;
+    }
+
+    // 걷기 또는 뛰기 선택
+    function chooseWalkOrRun(choice) {
+      if (choice === 'walk') {
+        walkItemFound();
+      } else {
+        runToSlime();
+      }
+    }
+
+    // 걷기 선택 후 아이템 발견 -> 레벨업
+    function walkItemFound() {
+      levelUp(false);
+      story.textContent = "천천히 걸으며 떨어진 아이템을 발견해 레벨업 했습니다!";
+      choices.innerHTML = `<button class="choice-btn" onclick="runToSlime()">계속</button>`;
+    }
+
+    // 뛰기 후 슬라임 출현
+    function runToSlime() {
+      story.textContent = "갑자기 교장쌤이 나타났습니다! 맞서 싸울까요, 도망갈까요?";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="slimeBattle('fight')">맞서 싸운다</button>
+        <button class="choice-btn" onclick="slimeBattle('run')">도망간다</button>
+      `;
+    }
+
+    // 교장쌤 전투 분기
+    function slimeBattle(choice) {
+      if (choice === 'fight') {
+        // 전투: 플레이어 공격 먼저, 교장쌤 체력 50, 공격력 1
+        monsters.slime.health = 50;
+        fightSlime();
+      } else {
+        // 도망치는 엔딩
+        showEnding("slimeAvoid");
+      }
+    }
+
+    // 교장쌤과 싸우는 전투 루프
+    function fightSlime() {
+      story.textContent = `교장쌤 체력: ${monsters.slime.health}\n당신 체력: ${playerHealth}\n공격 버튼을 눌러 공격하세요.`;
+      choices.innerHTML = `<button class="choice-btn" id="attackBtn">공격!</button>`;
+
+      const attackBtn = document.getElementById("attackBtn");
+      attackBtn.onclick = () => {
+        // 플레이어 공격
+        monsters.slime.health -= playerAttack;
+        if (monsters.slime.health <= 0) {
+          monsters.slime.health = 0;
+          levelUp(true); // 이기면 레벨업
+          afterSlimeVictory();
+          return;
+        }
+        // 교장쌤 반격
+        playerHealth -= monsters.slime.attack;
+        if (playerHealth <= 0) {
+          playerHealth = 0;
+          showEnding("curseDeath");
+          updateHealthDisplay();
+          return;
+        }
+        updateHealthDisplay();
+        story.textContent = `교장쌤 체력: ${monsters.slime.health}\n당신 체력: ${playerHealth}\n공격 버튼을 눌러 공격하세요.`;
+      };
+    }
+
+    // 교장쌤 승리 후 이벤트
+    function afterSlimeVictory() {
+      updateHealthDisplay();
+      walkCount = 0; // 걷기 횟수 초기화
+      story.textContent = "교장쌤을 물리쳤습니다! 이제 어떻게 할까요?";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="showWalkOrHomeChoices()">계속 걷기 혹은 집으로 가기 선택</button>
+      `;
+      showWalkOrHomeChoices();
+    }
+
+    // 걷기 혹은 집으로 가기 선택지 (3번 연속 걷기 시 숨겨진 구덩이 이벤트)
+    function showWalkOrHomeChoices() {
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="chooseWalkOrHome('walk')">계속 걷기</button>
+        <button class="choice-btn" onclick="chooseWalkOrHome('home')">집으로 가기</button>
+      `;
+    }
+
+    function chooseWalkOrHome(choice) {
+      if (choice === 'walk') {
+        walkCount++;
+        if (walkCount < 3) {
+          story.textContent = `당신은 계속 걸어갑니다... (${walkCount}번째 걷기)`;
+          showWalkOrHomeChoices();
+        } else {
+          fallIntoPit();
+        }
+      } else {
+        goHome();
+      }
+    }
+
+    // 숨겨진 구덩이에 빠짐
+    function fallIntoPit() {
+      story.textContent = "숨겨진 구덩이에 빠졌습니다! 주술 고전에 도착했습니다!";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="chooseTreasure('takeAll')">여기 있는 모든 보물을 가져간다</button>
+        <button class="choice-btn" onclick="chooseTreasure('leave')">저주가 걱정되어 그냥 나간다</button>
+      `;
+    }
+
+    function chooseTreasure(choice) {
+      if (choice === 'takeAll') {
+        levelUpBy(10);
+        story.textContent = `주술을 배워 특급 주술사가 되었습니다. 레벨이 25 상승했습니다! 현재 레벨: ${playerLevel}`;
+        setTimeout(goHome, 1500);
+      } else {
+        story.textContent = "저주를 피해서 그냥 나갑니다. 집으로 갑니다.";
+        setTimeout(goHome, 1500);
+      }
+      choices.innerHTML = "";
+    }
+
+    // 집으로 가서 방어구 입음
+    function goHome() {
+      playerMaxHealth += 50;
+      playerHealth = playerMaxHealth;
+      updateHealthDisplay();
+      resetBackground();
+      story.textContent = "반전 술식을 연마 하였습니다. 체력이 50 증가했습니다! 모험을 마칩니다.";
+      choices.innerHTML = `<button class="choice-btn" onclick="finalEvent()">다음</button>`;
+    }
+
+    // 최종 이벤트: 용이 강해져서 마을에 나타났다는 소식 듣기
+    function finalEvent() {
+      story.textContent = "역사상 최강 주저사가 왔습니다. 싸우겠습니까? 집에가서 그냥 쉬겠습니까? ";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="chooseFightOrRest('fight')">주저사와 싸우러</button>
+        <button class="choice-btn" onclick="chooseFightOrRest('rest')">집에 가서 쉰다</button>
+      `;
+    }
+
+    // 용과 싸울지 쉴지 선택
+    function chooseFightOrRest(choice) {
+      if (choice === 'fight') {
+        fightDragon();
+      } else {
+        showEnding("restAtHome");
+      }
+    }
+
+    // 용과 싸움 전투
+    function fightDragon() {
+      monsters.dragon.health = 750;
+      story.textContent = `역사상 최강 주저사와 싸웁니다! 주저사 체력: ${monsters.dragon.health}, 공격력: ${monsters.dragon.attack}`;
+      choices.innerHTML = `<button class="choice-btn" id="attackDragonBtn">공격!</button>`;
+
+      const attackDragonBtn = document.getElementById("attackDragonBtn");
+      attackDragonBtn.onclick = () => {
+        monsters.dragon.health -= playerAttack;
+        if (monsters.dragon.health <= 0) {
+          monsters.dragon.health = 0;
+          showEnding("dragonWin");
+          return;
+        }
+        playerHealth -= monsters.dragon.attack;
+        if (playerHealth <= 0) {
+          playerHealth = 0;
+          showEnding("dragonFightDeath");
+          updateHealthDisplay();
+          return;
+        }
+        updateHealthDisplay();
+        story.textContent = `주저사의 체력: ${monsters.dragon.health}\n당신 체력: ${playerHealth}\n공격 버튼을 눌러 공격하세요.`;
+      };
+    }
+
+    // 레벨업 함수 (showMessage 기본 true)
+    function levelUp(showMessage = true) {
+      playerLevel++;
+      playerMaxHealth += 5;
+      playerHealth = playerMaxHealth;
+      playerAttack += 5;
+      updateHealthDisplay();
+      if (showMessage) {
+        story.textContent = `레벨업! 현재 레벨: ${playerLevel}, 체력: ${playerHealth}, 공격력: ${playerAttack}`;
+      }
+    }
+
+    // 특정 수치만큼 레벨 올리기
+    function levelUpBy(levels) {
+      for(let i = 0; i < levels; i++) {
+        playerLevel++;
+        playerMaxHealth += 5;
+        playerAttack += 5;
+      }
+      playerHealth = playerMaxHealth;
+      updateHealthDisplay();
+    }
+
+    // 체력 UI 업데이트 + 매 턴 1씩 회복
+    function updateHealthDisplay() {
+      if (playerHealth < playerMaxHealth) {
+        playerHealth = Math.min(playerHealth + 1, playerMaxHealth);
+      }
+      healthDisplay.textContent = `${playerName} 체력: ${playerHealth} / ${playerMaxHealth} (레벨: ${playerLevel})`;
+    }
+
+    // 엔딩 화면 출력
+    function showEnding(type) {
+      resetBackground();
+      removeFireworks();
+
+      let bgColor = "";
+      let textColor = "#000";
+      let message = "";
+
+      switch(type) {
+        case "curseDeath":
+          bgColor = "#228B22";
+          textColor = "#fff";
+          message = "당신은 반전술식이 없어 엄청난 출혈으로 사망했습니다.\n없는걸 하다니 정말 멍청하닼ㅋ.";
+          break;
+
+        case "dragonDeath":
+          bgColor = "#000";
+          textColor = "#fff";
+          message = "당신은 용감했지만 무모했습니다.\n주저사은 너무나 강력했습니다.";
+          break;
+
+        case "slimeAvoid":
+          message = "당신은 4급 주령과 싸우는 것을 피했습니다. 그것도 쫄아서 도망 가다니,, 주술사를 할 자격이 없습니다"
+          break;
+
+        case "restAtHome":
+          message = "당신은 마을에 주저사이 처들어왔지만 집에 가서 잠을 잤습니다.\n꿈은 즐거웠지만 마을은 안전할까요?";
+          break;
+
+        case "dragonFightDeath":
+          message = "당신은 용감했지만 무모했습니다.\n다른 선택지를 찾아 강해지세요.";
+          break;
+
+        case "dragonWin":
+          message = "당신은 결국 역사상 최강 주저사 료멘 스쿠나를 죽이고 현대 최강 주술사가 되었습니다!";
+          startFireworks();
+          break;
+      }
+
+      body.style.backgroundColor = bgColor;
+      body.style.color = textColor;
+      story.textContent = message;
+      choices.innerHTML = `<button class="choice-btn" onclick="showReplayConfirm()">다음</button>`;
+    }
+
+    // 다시하기 확인 메시지
+    function showReplayConfirm() {
+      removeFireworks();
+      story.textContent = "주술을 다시 연마 하시겠습니까?";
+      choices.innerHTML = `
+        <button class="choice-btn" onclick="startAdventure()">예</button>
+        <button class="choice-btn" onclick="closeWindow()">아니오</button>
+      `;
+    }
+
+    // 창 닫기 시도
+    function closeWindow() {
+      if (confirm("진짜 갈꼬양?")) {
+        window.close();
+      }
+    }
+
+    // 배경 초기화
+    function resetBackground() {
+      body.style.backgroundColor = "#f0f0f0";
+      body.style.color = "#000";
+    }
+
+    // 폭죽 효과 시작
+    function startFireworks() {
+      body.classList.add("fireworks");
+    }
+
+    // 폭죽 효과 제거
+    function removeFireworks() {
+      body.classList.remove("fireworks");
+    }
+
+    // 게임 시작
+    startAdventure();
+
+  </script>
+</body>
+</html>
+
